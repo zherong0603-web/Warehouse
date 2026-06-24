@@ -1,0 +1,15 @@
+.DS_Store
+.ryan-outbox/
+ryan_round_*.md
+ryan_round_*.png
+auto_acceptance_*.md
+desktop_*.png
+.env
+.env.*
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+node_modules/
+__pycache__/
+.codex/tmp/

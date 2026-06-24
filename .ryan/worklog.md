@@ -1,0 +1,10 @@
+# Ryan Worklog
+
+This file is the human-readable record for Feishu/Lark remote tasks handled by Ryan.
+
+## 2026-06-24 21:50:43 CST
+- Message: ryan backup: install Ryan automatic worklog and local git backup
+- Project: /Users/oldking/Documents/Codex/2026-06-22/zarazhangrui-skill-minimac-codex/work/feishu-codex-default
+- Branch: main
+- GitHub remote: not bound yet
+
