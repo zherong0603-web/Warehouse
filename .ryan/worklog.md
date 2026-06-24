@@ -56,3 +56,9 @@ This file is the human-readable record for Feishu/Lark remote tasks handled by R
 - Branch: main
 - GitHub remote: git@github.com:zherong0603-web/Warehouse.git
 
+## 2026-06-25 00:41:57 CST
+- Message: ryan backup: migrate Warehouse project to stable Codex App path
+- Project: /Users/oldking/Documents/Codex/RyanProjects/Warehouse
+- Branch: main
+- GitHub remote: git@github.com:zherong0603-web/Warehouse.git
+
