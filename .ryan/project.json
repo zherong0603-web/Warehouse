@@ -3,14 +3,14 @@
   "projectRoot": "/Users/oldking/Documents/Codex/2026-06-22/zarazhangrui-skill-minimac-codex/work/feishu-codex-default",
   "projectName": "Warehouse",
   "githubRemote": "",
-  "updatedAt": "2026-06-24T15:24:04.172443+00:00",
+  "updatedAt": "2026-06-24T15:53:36.101258+00:00",
   "projectSlug": "Warehouse",
   "githubOwner": "zherong0603-web",
   "githubCandidates": [
     "git@github.com:zherong0603-web/Warehouse.git",
     "git@github.com:zherong0603-web/warehouse.git"
   ],
-  "githubStatus": "pending_repo_creation",
-  "githubStatusDetail": "GitHub repository not found; local git backup is complete",
+  "githubStatus": "bound",
+  "githubStatusDetail": "auto-bound existing GitHub repository",
   "githubPendingRemote": "git@github.com:zherong0603-web/Warehouse.git"
 }
