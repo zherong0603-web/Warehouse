@@ -62,3 +62,9 @@ This file is the human-readable record for Feishu/Lark remote tasks handled by R
 - Branch: main
 - GitHub remote: git@github.com:zherong0603-web/Warehouse.git
 
+## 2026-06-25 00:44:52 CST
+- Message: ryan backup: record Warehouse self-check after App path migration
+- Project: /Users/oldking/Documents/Codex/RyanProjects/Warehouse
+- Branch: main
+- GitHub remote: git@github.com:zherong0603-web/Warehouse.git
+
