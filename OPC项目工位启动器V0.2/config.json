@@ -1,0 +1,35 @@
+{
+  "version": "0.2",
+  "projectName": "OPC小红书封面工具",
+  "workspaceName": "OPC",
+  "spaceBackend": "aerospace",
+  "allowNativeMissionControlExperimental": false,
+  "workspaceRoot": "~/AI工位/OPC小红书封面工具",
+  "chatgptUrl": "https://chatgpt.com/g/g-p-69b97436b40c8191af4cc856df4cf42c/c/6a3e45c0-a11c-83ec-83cd-cb994548ce9f",
+  "links": [
+    {
+      "name": "ChatGPT OPC 项目对话",
+      "url": "https://chatgpt.com/g/g-p-69b97436b40c8191af4cc856df4cf42c/c/6a3e45c0-a11c-83ec-83cd-cb994548ce9f"
+    },
+    {
+      "name": "Canva",
+      "url": "https://www.canva.com/"
+    }
+  ],
+  "folders": [
+    "00_入口",
+    "01_商品资料_链接截图",
+    "02_小红书参考案例",
+    "03_封面素材",
+    "04_Canva导出",
+    "05_GPT输出文案",
+    "06_最终成品",
+    "07_Codex_未来开发",
+    "08_归档"
+  ],
+  "chrome": {
+    "mode": "isolatedUserDataDir",
+    "appName": "Google Chrome",
+    "profileDir": "00_入口/.chrome-profile"
+  }
+}
