@@ -1,0 +1,381 @@
+commit dc370f93c71a78a216e47ec11b6ba5cab6f11ecd
+Author: Ryan Backup <ryan-backup@local>
+Date:   Mon Jun 29 08:30:57 2026 +0800
+
+    ryan bridge: harden resume and app screenshots
+---
+ work/ryan-tools/bin/ryan-codex           |  24 +++--
+ work/ryan-tools/bin/ryan-health          |  52 ++++++++-
+ work/ryan-tools/bin/ryan-open-screenshot | 175 +++++++++++++++++++++++++++++++
+ 3 files changed, 242 insertions(+), 9 deletions(-)
+
+diff --git a/work/ryan-tools/bin/ryan-codex b/work/ryan-tools/bin/ryan-codex
+index 6d4c9df..a3e835c 100755
+--- a/work/ryan-tools/bin/ryan-codex
++++ b/work/ryan-tools/bin/ryan-codex
+@@ -10,6 +10,7 @@ REAL_CODEX="/Users/oldking/.local/bin/codex"
+ RYAN_SEND="/Users/oldking/.local/bin/ryan-send"
+ RYAN_BACKUP="/Users/oldking/.local/bin/ryan-backup"
+ RYAN_PROJECT="/Users/oldking/.local/bin/ryan-project"
++RYAN_OPEN_SCREENSHOT="/Users/oldking/.local/bin/ryan-open-screenshot"
+ 
+ needs_stdin_prefix=0
+ if [[ "${1:-}" == "exec" ]]; then
+@@ -26,8 +27,13 @@ if [[ "$needs_stdin_prefix" != "1" ]]; then
+ fi
+ 
+ resume_mode=0
+-if [[ "${1:-}" == "exec" && "${2:-}" == "resume" ]]; then
+-  resume_mode=1
++if [[ "${1:-}" == "exec" ]]; then
++  for arg in "$@"; do
++    if [[ "$arg" == "resume" ]]; then
++      resume_mode=1
++      break
++    fi
++  done
+ fi
+ 
+ user_prompt="$(/bin/cat)"
+@@ -124,11 +130,13 @@ if [[ "$inserted_cd" == "0" && "$resume_mode" == "0" ]]; then
+ fi
+ if [[ "$resume_mode" == "1" ]]; then
+   fixed_resume_args=()
++  resume_skip_inserted=0
+   for arg in "${new_args[@]}"; do
+     fixed_resume_args+=("$arg")
+-    if [[ "${#fixed_resume_args[@]}" -eq 2 && "$arg" == "resume" ]]; then
++    if [[ "$arg" == "resume" && "$resume_skip_inserted" == "0" ]]; then
+       fixed_resume_args+=("--skip-git-repo-check")
+       skip_git_added=1
++      resume_skip_inserted=1
+     fi
+   done
+   new_args=("${fixed_resume_args[@]}")
+@@ -194,9 +202,12 @@ cat <<EOF | exec "$REAL_CODEX" "${new_args[@]}"
+ 4. 如果你没有取到 chatId，ryan-send 会默认发到 owner 的 Ryan 私聊。
+ 5. 只能发送当前工作目录或 Ryan 发件箱里的文件。不要发送 .ssh、keychain、.env、密钥、系统隐私目录。
+ 6. 如果附件发送失败，要直接告诉用户失败原因，不要假装已经发出。
+-7. 如果本次任务创建或修改了文件，最终回复前必须运行一次 ryan-backup auto "ryan backup: <用一句话概括本次任务>"。这会写入 .ryan/worklog.md 并提交到本机 Git；如果项目已经绑定或自动识别到 GitHub，也会自动 push。
+-8. 如果 ryan-backup 提示 GitHub 仓库未找到或还没绑定，这不是任务失败；要告诉用户“本机 Git 备份成功，GitHub 远程仓库待绑定/待创建”。
+-9. 最终回复要明确说：做了什么、附件是否已发、文件本机路径在哪里、备份是否完成。
++7. 如果用户要求“打开/启动某个 App 并截图”，优先使用 ryan-open-screenshot。例子：
++   ryan-open-screenshot --chat-id <chatId> "梦幻西游"
++   这个工具会找 App、打开、截图、发飞书；找不到或打不开也会发当前桌面截图并说明原因。
++8. 如果本次任务创建或修改了文件，最终回复前必须运行一次 ryan-backup auto "ryan backup: <用一句话概括本次任务>"。这会写入 .ryan/worklog.md 并提交到本机 Git；如果项目已经绑定或自动识别到 GitHub，也会自动 push。
++9. 如果 ryan-backup 提示 GitHub 仓库未找到或还没绑定，这不是任务失败；要告诉用户“本机 Git 备份成功，GitHub 远程仓库待绑定/待创建”。
++10. 最终回复要明确说：做了什么、附件是否已发、文件本机路径在哪里、备份是否完成。
+ </ryan_delivery_rules>
+ 
+ <ryan_efficiency_rules>
+@@ -213,6 +224,7 @@ cat <<EOF | exec "$REAL_CODEX" "${new_args[@]}"
+ ryan-send 路径：$RYAN_SEND
+ ryan-backup 路径：$RYAN_BACKUP
+ ryan-project 路径：$RYAN_PROJECT
++ryan-open-screenshot 路径：$RYAN_OPEN_SCREENSHOT
+ 常用自检：ryan-send doctor
+ 一键验收：ryan-send selftest
+ 备份状态：ryan-backup status
+diff --git a/work/ryan-tools/bin/ryan-health b/work/ryan-tools/bin/ryan-health
+index b977534..0612dae 100755
+--- a/work/ryan-tools/bin/ryan-health
++++ b/work/ryan-tools/bin/ryan-health
+@@ -8,6 +8,7 @@ OLD_WORKSPACE="/Users/oldking/Documents/Codex/2026-06-22/zarazhangrui-skill-mini
+ CONFIG="/Users/oldking/.lark-channel/config.json"
+ PROJECTS="/Users/oldking/.lark-channel/ryan-tools/projects.json"
+ UNCLASSIFIED="/Users/oldking/Documents/Codex/RyanProjects/待归类项目"
++TEST_THREAD_ID="00000000-0000-0000-0000-000000000000"
+ 
+ total=0
+ failed=0
+@@ -125,7 +126,7 @@ PY
+ 
+ check_codex_resume_has_no_cd() {
+   local out
+-  out="$(printf '%s' 'Warehouse resume debug args' | RYAN_CODEX_DEBUG_ARGS=1 /Users/oldking/.local/bin/ryan-codex exec resume --skip-git-repo-check -C /tmp --skip-git-repo-check 00000000-0000-0000-0000-000000000000 -)"
++  out="$(printf '%s' 'Warehouse resume debug args' | RYAN_CODEX_DEBUG_ARGS=1 /Users/oldking/.local/bin/ryan-codex exec resume --skip-git-repo-check -C /tmp --skip-git-repo-check "$TEST_THREAD_ID" -)"
+   /usr/bin/python3 - "$out" <<'PY'
+ import json, sys
+ args = json.loads(sys.argv[1])
+@@ -137,6 +138,25 @@ assert args.count("--skip-git-repo-check") == 1, args
+ PY
+ }
+ 
++check_codex_resume_bridge_shape_has_no_cd() {
++  local out
++  out="$(printf '%s' '继续，把截图发我' | RYAN_CODEX_DEBUG_ARGS=1 /Users/oldking/.local/bin/ryan-codex exec --sandbox danger-full-access -c 'approval_policy="never"' -c 'shell_environment_policy.inherit="all"' --ignore-rules --skip-git-repo-check -C "$WAREHOUSE" resume --json "$TEST_THREAD_ID" -)"
++  /usr/bin/python3 - "$out" <<'PY'
++import json, sys
++args = json.loads(sys.argv[1])
++assert args[0] == "exec", args
++assert "resume" in args, args
++resume_at = args.index("resume")
++assert resume_at > 1, args
++assert args[resume_at + 1] == "--skip-git-repo-check", args
++assert "-C" not in args, args
++assert "--cd" not in args, args
++assert not any(str(arg).startswith("--cd=") for arg in args), args
++assert args.count("--skip-git-repo-check") == 1, args
++assert "--json" in args[resume_at:], args
++PY
++}
++
+ check_codex_resume_fallback_uses_current_workspace() {
+   local out
+   out="$(printf '%s' '继续，把截图发我' | RYAN_CODEX_DEBUG_CONTEXT=1 /Users/oldking/.local/bin/ryan-codex exec resume --last -)"
+@@ -153,13 +173,23 @@ PY
+ 
+ check_codex_resume_parser() {
+   local out exit_status
+-  out="$(printf '%s' 'resume parser smoke test' | RYAN_CODEX_SKIP_TASK=1 /Users/oldking/.local/bin/ryan-codex exec resume --skip-git-repo-check -C /tmp --skip-git-repo-check 00000000-0000-0000-0000-000000000000 - 2>&1)"
++  out="$(printf '%s' 'resume parser smoke test' | RYAN_CODEX_SKIP_TASK=1 /Users/oldking/.local/bin/ryan-codex exec resume --skip-git-repo-check -C /tmp --skip-git-repo-check "$TEST_THREAD_ID" - 2>&1)"
+   exit_status=$?
+   [[ "$exit_status" -ne 0 ]] &&
+     grep -q "no rollout found for thread id" <<<"$out" &&
+     ! grep -q "unexpected argument '-C'" <<<"$out"
+ }
+ 
++check_codex_resume_bridge_shape_parser() {
++  local out exit_status
++  out="$(printf '%s' 'bridge resume parser smoke test' | RYAN_CODEX_SKIP_TASK=1 /Users/oldking/.local/bin/ryan-codex exec --sandbox danger-full-access -c 'approval_policy="never"' -c 'shell_environment_policy.inherit="all"' --ignore-rules --skip-git-repo-check -C "$WAREHOUSE" resume --json "$TEST_THREAD_ID" - 2>&1)"
++  exit_status=$?
++  [[ "$exit_status" -ne 0 ]] &&
++    grep -q "no rollout found for thread id" <<<"$out" &&
++    ! grep -q "unexpected argument '-C'" <<<"$out" &&
++    ! grep -q "cannot be used multiple times" <<<"$out"
++}
++
+ check_codex_debug_no_task() {
+   local before after
+   before="$(find "$WAREHOUSE/.ryan/tasks" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' ')"
+@@ -215,7 +245,12 @@ check_local_bins() {
+   [[ -x "/Users/oldking/.local/bin/ryan-codex" ]] &&
+   [[ -x "/Users/oldking/.local/bin/ryan-send" ]] &&
+   [[ -x "/Users/oldking/.local/bin/ryan-backup" ]] &&
+-  [[ -x "/Users/oldking/.local/bin/ryan-project" ]]
++  [[ -x "/Users/oldking/.local/bin/ryan-project" ]] &&
++  [[ -x "/Users/oldking/.local/bin/ryan-open-screenshot" ]]
++}
++
++check_open_screenshot_tool() {
++  /Users/oldking/.local/bin/ryan-open-screenshot --dry-run 梦幻西游 | grep -q "/Applications/梦幻西游.app"
+ }
+ 
+ check_direct_help_commands() {
+@@ -225,6 +260,13 @@ check_direct_help_commands() {
+   grep -q "Ryan 使用方法" <<<"$help_out" && grep -q "Ryan 状态简报" <<<"$status_out"
+ }
+ 
++check_direct_help_commands_bridge_shape() {
++  local help_out status_out
++  help_out="$(printf '%s' '--help' | /Users/oldking/.local/bin/ryan-codex exec --sandbox danger-full-access --skip-git-repo-check -C "$WAREHOUSE" resume --json "$TEST_THREAD_ID" -)"
++  status_out="$(printf '%s' '-status' | /Users/oldking/.local/bin/ryan-codex exec --sandbox danger-full-access --skip-git-repo-check -C "$WAREHOUSE" resume --json "$TEST_THREAD_ID" -)"
++  grep -q "Ryan 使用方法" <<<"$help_out" && grep -q "Ryan 状态简报" <<<"$status_out"
++}
++
+ run_check "Warehouse directory exists" check_warehouse_dir
+ run_check "Warehouse is a Git repository" check_warehouse_git
+ run_check "Old workspace path points to Warehouse" check_old_workspace_link
+@@ -238,10 +280,13 @@ run_check "Warehouse prompt routes to Warehouse" check_warehouse_route
+ run_check "Unknown prompt routes to unclassified fallback" check_fallback_route
+ run_check "Codex wrapper keeps one skip-git flag and correct cwd" check_codex_debug_single_skip
+ run_check "Codex resume wrapper removes unsupported cd flag" check_codex_resume_has_no_cd
++run_check "Codex bridge-shaped resume wrapper removes unsupported cd flag" check_codex_resume_bridge_shape_has_no_cd
+ run_check "Codex resume fallback keeps current workspace" check_codex_resume_fallback_uses_current_workspace
+ run_check "Codex resume reaches session lookup without cd parse error" check_codex_resume_parser
++run_check "Codex bridge-shaped resume reaches session lookup without cd parse error" check_codex_resume_bridge_shape_parser
+ run_check "Codex wrapper debug mode does not create task files" check_codex_debug_no_task
+ run_check "Ryan direct help/status commands work" check_direct_help_commands
++run_check "Ryan direct help/status commands work with bridge-shaped resume" check_direct_help_commands_bridge_shape
+ run_check "Ryan backup status works" check_backup_status
+ run_check "Warehouse Git working tree is clean" check_git_clean
+ run_check "Warehouse GitHub remote is configured" check_remote_configured
+@@ -250,6 +295,7 @@ run_check "Codex doctor has no hard failure" check_codex_doctor
+ run_check "Ryan sender blocks sensitive paths" check_sensitive_block
+ run_check "Ryan sender blocks files outside workspace" check_outside_block
+ run_check "Ryan command symlinks are executable" check_local_bins
++run_check "Ryan open-app screenshot tool can locate 梦幻西游" check_open_screenshot_tool
+ 
+ if [[ "$failed" -eq 0 ]]; then
+   printf 'RESULT: PASS (%d checks)\n' "$total"
+diff --git a/work/ryan-tools/bin/ryan-open-screenshot b/work/ryan-tools/bin/ryan-open-screenshot
+new file mode 100755
+index 0000000..158000f
+--- /dev/null
++++ b/work/ryan-tools/bin/ryan-open-screenshot
+@@ -0,0 +1,175 @@
++#!/usr/bin/env zsh
++set -euo pipefail
++
++export PATH="/Users/oldking/.local/bin:/Users/oldking/.local/node-v24.16.0-darwin-arm64/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
++
++DEFAULT_WORKSPACE="/Users/oldking/Documents/Codex/RyanProjects/Warehouse"
++OUTBOX="${RYAN_OUTBOX:-$DEFAULT_WORKSPACE/.ryan-outbox}"
++RYAN_SEND="/Users/oldking/.local/bin/ryan-send"
++
++chat_args=()
++dry_run=0
++send_result=1
++wait_seconds=8
++
++usage() {
++  cat <<'EOF'
++Usage:
++  ryan-open-screenshot [--chat-id oc_xxx] [--wait seconds] [--no-send] [--dry-run] <app-name> [output.png]
++
++Examples:
++  ryan-open-screenshot 梦幻西游
++  ryan-open-screenshot --wait 12 梦幻西游 mhxy.png
++EOF
++}
++
++safe_name() {
++  /usr/bin/python3 - "$1" <<'PY'
++import re, sys
++name = sys.argv[1].strip() or "app"
++name = re.sub(r"[^\w.-]+", "_", name, flags=re.UNICODE).strip("._")
++print(name or "app")
++PY
++}
++
++realpath_portable() {
++  /usr/bin/perl -MCwd=abs_path -e 'print abs_path(shift)' "$1"
++}
++
++find_app() {
++  local query="$1"
++  if [[ -d "$query" ]]; then
++    realpath_portable "$query"
++    return
++  fi
++  local candidate
++  for candidate in \
++    "/Applications/${query}.app" \
++    "$HOME/Applications/${query}.app" \
++    "/Applications/梦幻西游.app"; do
++    if [[ -d "$candidate" ]]; then
++      case "$candidate" in
++        "/Applications/梦幻西游.app")
++          [[ "$query" == "梦幻西游" || "$query" == *"梦幻"* || "$query" == *"西游"* ]] || continue
++          ;;
++      esac
++      realpath_portable "$candidate"
++      return
++    fi
++  done
++
++  /usr/bin/python3 - "$query" <<'PY'
++import os, sys
++query = sys.argv[1].casefold()
++roots = ["/Applications", os.path.expanduser("~/Applications")]
++matches = []
++for root in roots:
++    if not os.path.isdir(root):
++        continue
++    for dirpath, dirnames, _filenames in os.walk(root):
++        depth = dirpath[len(root):].count(os.sep)
++        if depth >= 4:
++            dirnames[:] = []
++        for dirname in list(dirnames):
++            if not dirname.endswith(".app"):
++                continue
++            stem = dirname[:-4].casefold()
++            if query in stem or stem in query:
++                matches.append(os.path.join(dirpath, dirname))
++        if matches:
++            break
++    if matches:
++        break
++if matches:
++    print(os.path.realpath(matches[0]))
++PY
++}
++
++send_text_best_effort() {
++  local text="$1"
++  if [[ "$send_result" == "1" ]]; then
++    "$RYAN_SEND" "${chat_args[@]}" text "$text" >/dev/null 2>&1 || true
++  fi
++}
++
++send_image_best_effort() {
++  local image="$1"
++  if [[ "$send_result" == "1" ]]; then
++    "$RYAN_SEND" "${chat_args[@]}" image "$image" >/dev/null 2>&1 || true
++  fi
++}
++
++capture_current_screen() {
++  local target="$1"
++  /bin/mkdir -p "$OUTBOX"
++  /usr/sbin/screencapture -x "$target"
++}
++
++while [[ $# -gt 0 ]]; do
++  case "$1" in
++    --chat-id)
++      [[ $# -ge 2 ]] || { usage; exit 2; }
++      chat_args=(--chat-id "$2")
++      shift 2
++      ;;
++    --wait)
++      [[ $# -ge 2 ]] || { usage; exit 2; }
++      wait_seconds="$2"
++      shift 2
++      ;;
++    --no-send)
++      send_result=0
++      shift
++      ;;
++    --dry-run)
++      dry_run=1
++      send_result=0
++      shift
++      ;;
++    -h|--help)
++      usage
++      exit 0
++      ;;
++    *)
++      break
++      ;;
++  esac
++done
++
++[[ $# -ge 1 ]] || { usage; exit 2; }
++
++app_query="$1"
++shift
++base_name="$(safe_name "$app_query")"
++target_name="${1:-${base_name}_screenshot_$(/bin/date '+%Y%m%d_%H%M%S').png}"
++[[ "$target_name" == *.png ]] || target_name="${target_name}.png"
++target="$OUTBOX/$target_name"
++
++app_path="$(find_app "$app_query" | sed -n '1p')"
++if [[ -z "$app_path" || ! -d "$app_path" ]]; then
++  failure_shot="$OUTBOX/${base_name}_not_found_$(/bin/date '+%Y%m%d_%H%M%S').png"
++  capture_current_screen "$failure_shot" || true
++  send_text_best_effort "Ryan 没找到这个 App：$app_query。已发当前桌面截图供你确认。"
++  [[ -f "$failure_shot" ]] && send_image_best_effort "$failure_shot"
++  printf 'APP_NOT_FOUND app=%s screenshot=%s\n' "$app_query" "$failure_shot" >&2
++  exit 1
++fi
++
++if [[ "$dry_run" == "1" ]]; then
++  printf 'APP_FOUND %s\n' "$app_path"
++  exit 0
++fi
++
++if ! /usr/bin/open "$app_path"; then
++  failure_shot="$OUTBOX/${base_name}_open_failed_$(/bin/date '+%Y%m%d_%H%M%S').png"
++  capture_current_screen "$failure_shot" || true
++  send_text_best_effort "Ryan 找到了 App，但启动失败：$app_query。已发当前桌面截图。"
++  [[ -f "$failure_shot" ]] && send_image_best_effort "$failure_shot"
++  printf 'APP_OPEN_FAILED app=%s path=%s screenshot=%s\n' "$app_query" "$app_path" "$failure_shot" >&2
++  exit 1
++fi
++
++/bin/sleep "$wait_seconds"
++capture_current_screen "$target"
++send_image_best_effort "$target"
++printf 'OK app=%s path=%s screenshot=%s\n' "$app_query" "$app_path" "$target"
